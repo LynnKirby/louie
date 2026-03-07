@@ -54,6 +54,8 @@ static Expr* new_false_expr(ParseContext* context);
     Expr* expr;
     IfArm* if_arm;
     AstString* str;
+    BinaryOp bin_op;
+    UnaryOp un_op;
 }
 
 // General.
@@ -91,18 +93,20 @@ static Expr* new_false_expr(ParseContext* context);
 %type <expr> LogicalOrExpr
 %type <expr> UnaryExpr
 %type <expr> PrimaryExpr
+%type <bin_op> CompareOp
+%type <un_op> UnaryOp
 
 %start File
 
 %%
 
 File:
-    StmtSeq { SET_RESULT($1); }
+      StmtSeq { SET_RESULT($1); }
 
 StmtSeq: StmtSeq_inner { $$ = reverse_stmt_seq($1); }
 StmtSeq_inner:
       StmtSeq_inner Stmt { $2->next = $1; $$ = $2; }
-    | /* empty */  { $$ = NULL; }
+    | /* empty */        { $$ = NULL; }
 
 Stmt:
       PrintStmt  { $$ = $1; }
@@ -111,14 +115,14 @@ Stmt:
     | IfStmt     { $$ = $1; }
 
 PrintStmt:
-    PRINT '(' Expr ')' { $$ = PRINT_STMT($3); }
+      PRINT '(' Expr ')' { $$ = PRINT_STMT($3); }
 
 VarStmt:
       VAR ID          { $$ = VAR_STMT($2, NULL); }
     | VAR ID '=' Expr { $$ = VAR_STMT($2, $4); }
 
 AssignStmt:
-    ID '=' Expr { $$ = ASSIGN_STMT($1, $3); }
+      ID '=' Expr { $$ = ASSIGN_STMT($1, $3); }
 
 IfStmt:
       IF IfArms END              { $$ = IF_STMT($2, NULL); }
@@ -129,16 +133,17 @@ IfArms:
     | IfArm               { $$ = $1; }
 
 IfArm:
-    Expr THEN StmtSeq { $$ = IF_ARM($1, $3); }
+      Expr THEN StmtSeq { $$ = IF_ARM($1, $3); }
 
 Expr:
-      UnaryExpr { $$ = $1; }
+      UnaryExpr      { $$ = $1; }
     | LogicalAndExpr { $$ = $1; }
-    | LogicalOrExpr { $$ = $1; }
-    | UnaryExpr EQ_EQ UnaryExpr
-        { $$ = BINARY_EXPR($1, $3, BinaryOp_Equal); }
-    | UnaryExpr NOT_EQ UnaryExpr
-        { $$ = BINARY_EXPR($1, $3, BinaryOp_NotEqual); }
+    | LogicalOrExpr  { $$ = $1; }
+    | UnaryExpr CompareOp UnaryExpr { $$ = BINARY_EXPR($1, $3, $2); }
+
+CompareOp:
+      EQ_EQ  { $$ = BinaryOp_Equal; }
+    | NOT_EQ { $$ = BinaryOp_NotEqual; }
 
 LogicalAndExpr:
       LogicalAndExpr AMP_AMP UnaryExpr
@@ -153,8 +158,11 @@ LogicalOrExpr:
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalOr); }
 
 UnaryExpr:
-      PrimaryExpr   { $$ = $1; }
-    | '!' UnaryExpr { $$ = UNARY_EXPR($2, UnaryOp_LogicalNot); }
+      PrimaryExpr       { $$ = $1; }
+    | UnaryOp UnaryExpr { $$ = UNARY_EXPR($2, $1); }
+
+UnaryOp:
+      '!' { $$ = UnaryOp_LogicalNot; }
 
 PrimaryExpr:
       '(' Expr ')' { $$ = $2; }

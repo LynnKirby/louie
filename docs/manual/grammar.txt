@@ -1,0 +1,95 @@
+\appendix{Grammar summary}
+
+\section{Lexical grammar}
+
+\begin{peg}
+file <- (token / trivia)*
+
+token <-
+    "elseif" !id_continue
+    "else" !id_continue
+    "end" !id_continue
+    "false" !id_continue
+    "if" !id_continue
+    "print" !id_continue
+    "then" !id_continue
+    "true" !id_continue
+    "var" !id_continue
+    ID
+    "("
+    ")"
+    "=="
+    "="
+    "!="
+    "!"
+    "&&"
+    "||"
+
+trivia <-
+    newline
+    [ \t]
+    "#" (!newline .)*
+
+newline <-
+    <U+000D Carriage Return> <U+000A Line Feed>?
+    <U+000A Line Feed>
+
+id_start <- [a-zA-Z_]
+id_continue <- id_start / [0-9]
+ID <- id_start id_continue*
+\end{peg}
+
+\section{Hierarchical grammar}
+
+\begin{cfg}
+StmtSeq ::=
+    Stmt*
+
+Stmt ::=
+    PrintStmt
+    VarStmt
+    AssignStmt
+    IfStmt
+
+PrintStmt ::=
+    "print" "(" Expr ")"
+
+VarStmt ::=
+    "var" ID ("=" Expr)?
+
+AssignStmt ::=
+    ID "=" Expr
+
+IfStmt ::=
+    "if" IfArms ("else" StmtSeq)? "end"
+
+IfArms ::=
+    Expr "then" StmtSeq ("elseif" IfArms)?
+
+Expr ::=
+    UnaryExpr
+    LogicalAndExpr
+    LogicalOrExpr
+    UnaryExpr CompareOp UnaryExpr
+
+CompareOp ::=
+    "==" | "!="
+
+LogicalAndExpr ::=
+    LogicalAndExpr "&&" UnaryExpr
+    UnaryExpr "&&" UnaryExpr
+
+LogicalOrExpr ::=
+    LogicalOrExpr "||" UnaryExpr
+    UnaryExpr "||" UnaryExpr
+
+UnaryExpr ::=
+    PrimaryExpr
+    "!" UnaryExpr
+
+PrimaryExpr ::=
+    "(" Expr ")"
+    ID
+    "true"
+    "false"
+\end{cfg}
