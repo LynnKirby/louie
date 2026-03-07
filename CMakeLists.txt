@@ -6,6 +6,12 @@ option(LOUIE_ENABLE_WARNINGS ""  TRUE)
 option(LOUIE_ENABLE_ASAN "" FALSE)
 option(LOUIE_ENABLE_UBSAN "" FALSE)
 
+find_program(
+    YACC_EXECUTABLE
+    NAMES byacc bison
+    REQUIRED
+)
+
 include(CTest)
 
 add_library(louie-options INTERFACE)
@@ -39,10 +45,33 @@ target_link_options(
 target_compile_features(louie-options INTERFACE c_std_99)
 target_include_directories(louie-options INTERFACE .)
 
+#
+# Parser
+#
+
+add_custom_command(
+    OUTPUT src/parse.tab.c
+    BYPRODUCTS src/parse.output
+    MAIN_DEPENDENCY src/parse.y
+    COMMAND
+        "${YACC_EXECUTABLE}"
+        -v
+        -b src/parse
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/parse.y"
+)
+
+#
+# Main executable
+#
+
 add_executable(
     louie
-        src/main.c
         src/arena.c
+        src/ast.c
+        src/ast_dump.c
+        src/eval.c
+        src/main.c
+        src/parse.tab.c
 )
 
 add_louie_options(louie)
