@@ -105,14 +105,24 @@ File:
 
 StmtSeq: StmtSeq_inner { $$ = reverse_stmt_seq($1); }
 StmtSeq_inner:
-      StmtSeq_inner Stmt { $2->next = $1; $$ = $2; }
-    | /* empty */        { $$ = NULL; }
+      StmtSeq_inner Stmt
+        {
+            if ($2 == NULL) {
+                // Ignore ";" skip statement.
+                $$ = $1;
+            } else {
+                $2->next = $1;
+                $$ = $2;
+            }
+        }
+    | /* empty */ { $$ = NULL; }
 
 Stmt:
       PrintStmt  { $$ = $1; }
     | VarStmt    { $$ = $1; }
     | AssignStmt { $$ = $1; }
     | IfStmt     { $$ = $1; }
+    | ';'        { $$ = NULL; }
 
 PrintStmt:
       PRINT '(' Expr ')' { $$ = PRINT_STMT($3); }
@@ -283,6 +293,7 @@ loop:
         context->cursor_column += 1;
         goto loop;
 
+    // Newline.
     case '\r':
         if (context->cursor + 1 != context->limit && *context->cursor == '\n') {
             // CR LF
@@ -295,7 +306,9 @@ loop:
         context->cursor_column = 1;
         goto loop;
 
+    // One character symbols that are not a prefix of another symbol.
     case '(': case ')':
+    case ';':
         context->cursor += 1;
         context->cursor_column += 1;
         return c;
