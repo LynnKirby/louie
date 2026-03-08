@@ -81,7 +81,7 @@ static Variable* declare_variable(Scope* scope, AstString* name) {
 }
 
 static void eval_stmt(Scope* scope, Stmt* stmt);
-static void eval_stmt_seq(Scope* scope, Stmt* stmt_seq);
+static void eval_stmt_seq(Scope* scope, StmtSeq seq);
 static TaggedValue eval_expr(Scope* scope, Expr* expr);
 
 static TaggedValue eval_expr(Scope* scope, Expr* expr) {
@@ -193,7 +193,7 @@ static void eval_stmt(Scope* scope, Stmt* stmt) {
             }
             arm = arm->next;
         }
-        if (if_stmt->else_body != NULL) {
+        if (if_stmt->else_body.first != NULL) {
             eval_stmt_seq(scope, if_stmt->else_body);
         }
         break;
@@ -224,16 +224,17 @@ static void eval_stmt(Scope* scope, Stmt* stmt) {
     }
 }
 
-static void eval_stmt_seq(Scope* parent_scope, Stmt* stmt_seq) {
+static void eval_stmt_seq(Scope* parent_scope, StmtSeq seq) {
     Scope scope = {
         .parent = parent_scope,
         .variables = NULL,
     };
 
-    while (stmt_seq != NULL) {
-        Stmt* stmt = stmt_seq;
-        stmt_seq = stmt_seq->next;
+    Stmt* stmt = seq.first;
+
+    while (stmt != NULL) {
         eval_stmt(&scope, stmt);
+        stmt = stmt->next;
     }
 
     while (scope.variables != NULL) {
@@ -243,6 +244,6 @@ static void eval_stmt_seq(Scope* parent_scope, Stmt* stmt_seq) {
     }
 }
 
-void eval(Stmt* stmt_seq) {
-    eval_stmt_seq(NULL, stmt_seq);
+void eval(StmtSeq seq) {
+    eval_stmt_seq(NULL, seq);
 }

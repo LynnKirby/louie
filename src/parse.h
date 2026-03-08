@@ -26,7 +26,7 @@ typedef enum ParseResultKind {
 typedef struct ParseResult {
     ParseResultKind kind;
     union {
-        Stmt* body;
+        AstFile* file;
         SyntaxError syntax_error;
     } as;
 } ParseResult;

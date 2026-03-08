@@ -3,6 +3,6 @@
 
 #include "src/ast.h"
 
-void eval(Stmt* stmt_seq);
+void eval(StmtSeq seq);
 
 #endif

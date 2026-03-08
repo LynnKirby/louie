@@ -48,12 +48,18 @@ static void print_string(FILE* file, AstString* str) {
     fprintf(file, "\"%s\"", ast_string_data(str));
 }
 
+void dump_file(FILE* file, AstFile* ast_file, int indent) {
+    print_indent(file, indent);
+    fprintf(file, "File\n");
+    dump_stmt_seq(file, ast_file->body, indent + 1);
+}
+
 //
 // Statements
 //
 
-void dump_stmt_seq(FILE* file, Stmt const* stmt_seq, int indent) {
-    Stmt const* stmt = stmt_seq;
+void dump_stmt_seq(FILE* file, StmtSeq seq, int indent) {
+    Stmt const* stmt = seq.first;
 
     if (stmt == NULL) {
         return;
@@ -103,9 +109,7 @@ static void dump_if_stmt(FILE* file, IfStmt const* stmt, int indent) {
         arm = arm->next;
     }
 
-    if (stmt->else_body != NULL) {
-        dump_stmt_seq(file, stmt->else_body, indent + 1);
-    }
+    dump_stmt_seq(file, stmt->else_body, indent + 1);
 }
 
 static void dump_var_stmt(FILE* file, VarStmt const* stmt, int indent) {

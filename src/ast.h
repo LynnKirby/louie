@@ -28,7 +28,9 @@ char const* ast_string_data(AstString* string);
 // AST basics
 //
 
+typedef struct AstFile AstFile;
 typedef struct Stmt Stmt;
+typedef struct StmtSeq StmtSeq;
 typedef struct Expr Expr;
 
 #define STMT_KIND_LIST(X) \
@@ -82,9 +84,23 @@ char const* expr_kind_name(ExprKind kind);
 char const* unary_op_name(UnaryOp op);
 char const* binary_op_name(BinaryOp op);
 
-void dump_stmt_seq(FILE* file, Stmt const* stmt_seq, int indent);
+void dump_file(FILE* file, AstFile* ast_file, int indent);
+void dump_stmt_seq(FILE* file, StmtSeq seq, int indent);
 void dump_stmt(FILE* file, Stmt const* stmt, int indent);
 void dump_expr(FILE* file, Expr const* expr, int indent);
+
+//
+// Top level
+//
+
+struct StmtSeq {
+    Stmt* first;
+    Stmt* last;
+};
+
+struct AstFile {
+    StmtSeq body;
+};
 
 //
 // Statements
@@ -98,13 +114,13 @@ struct Stmt {
 typedef struct IfArm {
     struct IfArm* next; // nullable
     Expr* condition;
-    Stmt* body;
+    StmtSeq body;
 } IfArm;
 
 typedef struct IfStmt {
     Stmt base;
     IfArm* if_arms;
-    Stmt* else_body; // nullable
+    StmtSeq else_body;
 } IfStmt;
 
 typedef struct VarStmt {
@@ -149,5 +165,20 @@ typedef struct BinaryExpr {
     Expr* left_operand;
     Expr* right_operand;
 } BinaryExpr;
+
+static inline StmtSeq stmt_seq_empty(void) {
+    return (StmtSeq){ NULL, NULL };
+}
+
+static inline void stmt_seq_push(StmtSeq* seq, Stmt* stmt) {
+    if (seq->first == NULL) {
+        seq->first = stmt;
+        seq->last = stmt;
+    } else {
+        seq->last->next = stmt;
+    }
+    seq->last = stmt;
+    stmt->next = NULL;
+}
 
 #endif

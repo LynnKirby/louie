@@ -21,14 +21,13 @@ static void yyerror(YaccLocation* loc, ParseContext* context, char const* messag
 
 static int yylex(YaccValue* val, YaccLocation* loc, ParseContext* context);
 
-static Stmt* reverse_stmt_seq(Stmt* stmt_seq);
-static void set_result(ParseContext* context, Stmt* stmt_seq);
+static void set_result(ParseContext* context, StmtSeq seq);
 
 static Stmt* new_print_stmt(ParseContext* context, Expr* value);
 static Stmt* new_var_stmt(ParseContext* context, AstString* name, Expr* value);
 static Stmt* new_assign_stmt(ParseContext* context, AstString* name, Expr* value);
-static Stmt* new_if_stmt(ParseContext* context, IfArm* if_arms, Stmt* else_part);
-static IfArm* new_if_arm(ParseContext* context, Expr* condition, Stmt* body);
+static Stmt* new_if_stmt(ParseContext* context, IfArm* if_arms, StmtSeq else_part);
+static IfArm* new_if_arm(ParseContext* context, Expr* condition, StmtSeq body);
 static Expr* new_unary_expr(ParseContext* context, Expr* operand, UnaryOp operator);
 static Expr* new_binary_expr(ParseContext* context, Expr* left, Expr* right, BinaryOp operator);
 static Expr* new_id_expr(ParseContext* context, AstString* name);
@@ -50,6 +49,7 @@ static Expr* new_false_expr(ParseContext* context);
 }
 
 %union {
+    StmtSeq stmt_seq;
     Stmt* stmt;
     Expr* expr;
     IfArm* if_arm;
@@ -79,8 +79,7 @@ static Expr* new_false_expr(ParseContext* context);
 %token NOT_EQ
 
 // Non-terminal types.
-%type <stmt> StmtSeq
-%type <stmt> StmtSeq_inner
+%type <stmt_seq> StmtSeq
 %type <stmt> Stmt
 %type <stmt> PrintStmt
 %type <stmt> VarStmt
@@ -103,19 +102,15 @@ static Expr* new_false_expr(ParseContext* context);
 File:
       StmtSeq { SET_RESULT($1); }
 
-StmtSeq: StmtSeq_inner { $$ = reverse_stmt_seq($1); }
-StmtSeq_inner:
-      StmtSeq_inner Stmt
+StmtSeq:
+      StmtSeq Stmt
         {
-            if ($2 == NULL) {
-                // Ignore ";" skip statement.
-                $$ = $1;
-            } else {
-                $2->next = $1;
-                $$ = $2;
+            $$ = $1;
+            if ($2 != NULL) {
+                stmt_seq_push(&$$, $2);
             }
         }
-    | /* empty */ { $$ = NULL; }
+    | /* empty */ { $$ = stmt_seq_empty(); }
 
 Stmt:
       PrintStmt  { $$ = $1; }
@@ -135,7 +130,7 @@ AssignStmt:
       ID '=' Expr { $$ = ASSIGN_STMT($1, $3); }
 
 IfStmt:
-      IF IfArms END              { $$ = IF_STMT($2, NULL); }
+      IF IfArms END              { $$ = IF_STMT($2, stmt_seq_empty()); }
     | IF IfArms ELSE StmtSeq END { $$ = IF_STMT($2, $4); }
 
 IfArms:
@@ -201,7 +196,7 @@ struct ParseContext {
     YaccLocation error_loc;
     bool has_unexpected_character;
 
-    Stmt* result;
+    ParseResult* result;
 };
 
 static bool is_id_start(uint8_t c) {
@@ -380,7 +375,7 @@ void parse_bytes(
         .arena = arena,
         .cursor = (uint8_t const*)data,
         .limit = (uint8_t const*)data + size,
-        .result = NULL,
+        .result = result,
         .cursor_line = 1,
         .cursor_column = 1,
         .has_unexpected_character = false,
@@ -390,8 +385,6 @@ void parse_bytes(
     // elsewhere.
     switch (yyparse(&context)) {
     case 0:
-        result->kind = ParseResultKind_Success;
-        result->as.body = context.result;
         break;
 
     case 1:
@@ -416,22 +409,11 @@ void parse_bytes(
     }
 }
 
-static void set_result(ParseContext* context, Stmt* stmt_seq) {
-    context->result = stmt_seq;
-}
-
-static Stmt* reverse_stmt_seq(Stmt* stmt_seq) {
-    Stmt* prev = NULL;
-    Stmt* stmt = stmt_seq;
-
-    while (stmt != NULL) {
-        Stmt* next = stmt->next;
-        stmt->next = prev;
-        prev = stmt;
-        stmt = next;
-    }
-
-    return prev;
+static void set_result(ParseContext* context, StmtSeq seq) {
+    AstFile* file = arena_allocate(context->arena, sizeof(AstFile));
+    file->body = seq;
+    context->result->kind = ParseResultKind_Success;
+    context->result->as.file = file;
 }
 
 static Stmt* new_print_stmt(ParseContext* context, Expr* value) {
@@ -463,7 +445,7 @@ static Stmt* new_assign_stmt(
 }
 
 static Stmt* new_if_stmt(
-    ParseContext* context, IfArm* if_arms, Stmt* else_body
+    ParseContext* context, IfArm* if_arms, StmtSeq else_body
 ) {
     IfStmt* stmt = arena_allocate(context->arena, sizeof(IfStmt));
     stmt->base.kind = StmtKind_If;
@@ -473,7 +455,7 @@ static Stmt* new_if_stmt(
     return (Stmt*)stmt;
 }
 
-static IfArm* new_if_arm(ParseContext* context, Expr* condition, Stmt* body) {
+static IfArm* new_if_arm(ParseContext* context, Expr* condition, StmtSeq body) {
     IfArm* part = arena_allocate(context->arena, sizeof(IfArm));
     part->next = NULL;
     part->condition = condition;

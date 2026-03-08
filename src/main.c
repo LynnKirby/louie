@@ -90,10 +90,10 @@ int main(int argc, char const* argv[]) {
         goto exit;
     }
 
-    dump_stmt_seq(stdout, parse_result.as.body, 0);
+    dump_file(stdout, parse_result.as.file, 0);
 
     printf("=== EVAL ===\n");
-    eval(parse_result.as.body);
+    eval(parse_result.as.file->body);
 
 exit:
     arena_destroy(&ast_arena);
