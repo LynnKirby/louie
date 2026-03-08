@@ -199,6 +199,7 @@ struct ParseContext {
     int cursor_column;
 
     YaccLocation error_loc;
+    bool has_unexpected_character;
 
     Stmt* result;
 };
@@ -251,7 +252,10 @@ loop:
         context->cursor += 1;
         context->cursor_column += 1;
 
-        while (is_id_continue(*context->cursor)) {
+        while (
+            (context->cursor < context->limit) &&
+            is_id_continue(*context->cursor)
+        ) {
             context->cursor += 1;
             context->cursor_column += 1;
         }
@@ -358,17 +362,14 @@ loop:
         break;
     }
 
-    // TODO: don't abort
-    fprintf(
-        stderr,
-        "error: unexpected character at %i:%i\n",
-        loc->first_line,
-        loc->first_column
-    );
-    exit(1);
+    // TODO: report character
+    context->has_unexpected_character = true;
+    context->error_loc = *loc;
+    return 1;
 }
 
-Stmt* parse_bytes(
+void parse_bytes(
+    ParseResult* result,
     AstContext* ast_context,
     Arena* arena,
     char const* data,
@@ -382,37 +383,37 @@ Stmt* parse_bytes(
         .result = NULL,
         .cursor_line = 1,
         .cursor_column = 1,
+        .has_unexpected_character = false,
     };
 
     // Note: these values are correct for byacc and Bison. They might not work
     // elsewhere.
     switch (yyparse(&context)) {
     case 0:
+        result->kind = ParseResultKind_Success;
+        result->as.body = context.result;
         break;
 
     case 1:
-        // TODO: don't abort
-        fprintf(
-            stderr,
-            "error: unexpected token at %i:%i\n",
-            context.error_loc.first_line,
-            context.error_loc.first_column
-        );
-        exit(1);
+        result->kind = ParseResultKind_SyntaxError;
+        result->as.syntax_error.line = context.error_loc.first_line;
+        result->as.syntax_error.column = context.error_loc.first_column;
+        if (context.has_unexpected_character) {
+            result->as.syntax_error.kind = SyntaxErrorKind_UnexpectedCharacter;
+        } else {
+            // TODO: report token
+            result->as.syntax_error.kind = SyntaxErrorKind_UnexpectedToken;
+        }
         break;
 
     case 2:
-        // TODO: don't abort
-        fprintf(stderr, "error: out of memory while parsing\n");
-        exit(1);
+        result->kind = ParseResultKind_OutOfMemory;
         break;
 
     default:
         assert(!"unexpected yyparse() result code");
         break;
     }
-
-    return context.result;
 }
 
 static void set_result(ParseContext* context, Stmt* stmt_seq) {

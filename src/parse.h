@@ -6,7 +6,33 @@
 
 #include <stddef.h>
 
-Stmt* parse_bytes(
+typedef enum SyntaxErrorKind {
+    SyntaxErrorKind_UnexpectedCharacter,
+    SyntaxErrorKind_UnexpectedToken,
+} SyntaxErrorKind;
+
+typedef struct SyntaxError {
+    SyntaxErrorKind kind;
+    int line;
+    int column;
+} SyntaxError;
+
+typedef enum ParseResultKind {
+    ParseResultKind_Success,
+    ParseResultKind_SyntaxError,
+    ParseResultKind_OutOfMemory,
+} ParseResultKind;
+
+typedef struct ParseResult {
+    ParseResultKind kind;
+    union {
+        Stmt* body;
+        SyntaxError syntax_error;
+    } as;
+} ParseResult;
+
+void parse_bytes(
+    ParseResult* result,
     AstContext* context,
     Arena* arena,
     char const* data,

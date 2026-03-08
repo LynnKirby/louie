@@ -25,6 +25,9 @@ int main(int argc, char const* argv[]) {
     size_t size = 0;
     AstContext* ast_context = NULL;
 
+    Arena ast_arena;
+    arena_init(&ast_arena);
+
     for (;;) {
         char chunk[1024];
         size_t res = fread(chunk, 1, sizeof(chunk), f);
@@ -57,19 +60,43 @@ int main(int argc, char const* argv[]) {
         goto exit;
     }
 
-    Arena ast_arena;
-    arena_init(&ast_arena);
-
     printf("=== PARSE ===\n");
-    Stmt* file_stmts = parse_bytes(ast_context, &ast_arena, data, size);
-    dump_stmt_seq(stdout, file_stmts, 0);
+    ParseResult parse_result;
+    parse_bytes(&parse_result, ast_context, &ast_arena, data, size);
+
+    switch (parse_result.kind) {
+    case ParseResultKind_Success:
+        break;
+
+    case ParseResultKind_SyntaxError: {
+        SyntaxError* error = &parse_result.as.syntax_error;
+        fprintf(stderr, "%s:%i:%i: ", path, error->line, error->column);
+        switch (error->kind) {
+        case SyntaxErrorKind_UnexpectedCharacter:
+            fprintf(stderr, "unexpected character");
+            break;
+        case SyntaxErrorKind_UnexpectedToken:
+            fprintf(stderr, "unexpected token");
+            break;
+        }
+        fprintf(stderr, "\n");
+        status = 1;
+        goto exit;
+    }
+
+    case ParseResultKind_OutOfMemory:
+        fprintf(stderr, "error: out of memory\n");
+        status = 1;
+        goto exit;
+    }
+
+    dump_stmt_seq(stdout, parse_result.as.body, 0);
 
     printf("=== EVAL ===\n");
-    eval(file_stmts);
-
-    arena_destroy(&ast_arena);
+    eval(parse_result.as.body);
 
 exit:
+    arena_destroy(&ast_arena);
     ast_context_delete(ast_context);
     free(data);
 
