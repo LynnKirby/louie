@@ -183,6 +183,11 @@ void dump_expr(FILE* file, Expr const* expr, int indent) {
         fprintf(file, "BoolLiteral true\n");
         break;
 
+    case ExprKind_IntLiteral:
+        print_indent(file, indent);
+        fprintf(file, "IntLiteral %i\n", ((IntLiteralExpr*)expr)->value);
+        break;
+
     case ExprKind_Unary:
         dump_unary_expr(file, (UnaryExpr const*)expr, indent);
         break;

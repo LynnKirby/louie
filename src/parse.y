@@ -33,6 +33,7 @@ static Expr* new_binary_expr(ParseContext* context, Expr* left, Expr* right, Bin
 static Expr* new_id_expr(ParseContext* context, AstString* name);
 static Expr* new_true_expr(ParseContext* context);
 static Expr* new_false_expr(ParseContext* context);
+static Expr* new_int_literal_expr(ParseContext* context, int i);
 
 #define SET_RESULT(...) set_result(context, __VA_ARGS__)
 #define PRINT_STMT(...) new_print_stmt(context, __VA_ARGS__)
@@ -45,11 +46,13 @@ static Expr* new_false_expr(ParseContext* context);
 #define ID_EXPR(...) new_id_expr(context, __VA_ARGS__)
 #define TRUE_EXPR(...) new_true_expr(context)
 #define FALSE_EXPR(...) new_false_expr(context)
+#define INT_LITERAL_EXPR(...) new_int_literal_expr(context, __VA_ARGS__)
 
 }
 
 %union {
     StmtSeq stmt_seq;
+    int i;
     Stmt* stmt;
     Expr* expr;
     IfArm* if_arm;
@@ -60,6 +63,7 @@ static Expr* new_false_expr(ParseContext* context);
 
 // General.
 %token <str> ID
+%token <i> INT_LITERAL
 
 // Keywords.
 %token ELSE
@@ -90,9 +94,11 @@ static Expr* new_false_expr(ParseContext* context);
 %type <expr> Expr
 %type <expr> LogicalAndExpr
 %type <expr> LogicalOrExpr
+%type <expr> TermExpr
 %type <expr> UnaryExpr
 %type <expr> PrimaryExpr
 %type <bin_op> CompareOp
+%type <bin_op> TermOp
 %type <un_op> UnaryOp
 
 %start File
@@ -145,6 +151,7 @@ Expr:
     | LogicalAndExpr { $$ = $1; }
     | LogicalOrExpr  { $$ = $1; }
     | UnaryExpr CompareOp UnaryExpr { $$ = BINARY_EXPR($1, $3, $2); }
+    | TermExpr       { $$ = $1; }
 
 CompareOp:
       EQ_EQ  { $$ = BinaryOp_Equal; }
@@ -162,18 +169,30 @@ LogicalOrExpr:
     | UnaryExpr BAR_BAR UnaryExpr
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalOr); }
 
+TermExpr:
+      TermExpr TermOp UnaryExpr
+        { $$ = BINARY_EXPR($1, $3, $2); }
+    | UnaryExpr TermOp UnaryExpr
+        { $$ = BINARY_EXPR($1, $3, $2); }
+
+TermOp:
+      '+' { $$ = BinaryOp_Add; }
+    | '-' { $$ = BinaryOp_Subtract; }
+
 UnaryExpr:
       PrimaryExpr       { $$ = $1; }
     | UnaryOp UnaryExpr { $$ = UNARY_EXPR($2, $1); }
 
 UnaryOp:
       '!' { $$ = UnaryOp_LogicalNot; }
+    | '-' { $$ = UnaryOp_Negate; }
 
 PrimaryExpr:
       '(' Expr ')' { $$ = $2; }
     | ID           { $$ = ID_EXPR($1); }
     | TRUE         { $$ = TRUE_EXPR(); }
     | FALSE        { $$ = FALSE_EXPR(); }
+    | INT_LITERAL  { $$ = INT_LITERAL_EXPR($1); }
 
 %%
 
@@ -271,6 +290,37 @@ loop:
 
     uint8_t c = *context->cursor;
 
+    if (c == '0') {
+        // TODO: report actual error (leading zero not allowed)
+        goto unexpected_character;
+    }
+
+    if (c >= '1' && c <= '9') {
+        unsigned i = c - '0';
+        context->cursor += 1;
+        context->cursor_column += 1;
+        for (;;) {
+            if (context->cursor == context->limit) break;
+            c = *context->cursor;
+            if (c < '0' || c > '9') break;
+            i *= 10;
+            i += c - '0';
+            context->cursor += 1;
+            context->cursor_column += 1;
+        }
+
+        if (context->cursor < context->limit) {
+            c = *context->cursor;
+            if (is_id_continue(c)) {
+                // TODO: report the actual error (trailing junk after literal)
+                goto unexpected_character;
+            }
+        }
+
+        val->i = i;
+        return INT_LITERAL;
+    }
+
     switch (c) {
     // Line comment.
     case '#':
@@ -308,6 +358,8 @@ loop:
     // One character symbols that are not a prefix of another symbol.
     case '(': case ')':
     case ';':
+    case '+':
+    case '-':
         context->cursor += 1;
         context->cursor_column += 1;
         return c;
@@ -357,7 +409,10 @@ loop:
         break;
     }
 
+unexpected_character:
     // TODO: report character
+    loc->first_line = context->cursor_line;
+    loc->first_column = context->cursor_column;
     context->has_unexpected_character = true;
     context->error_loc = *loc;
     return 1;
@@ -501,4 +556,13 @@ static Expr* new_false_expr(ParseContext* context) {
     Expr* expr = arena_allocate(context->arena, sizeof(Expr));
     expr->kind = ExprKind_FalseLiteral;
     return expr;
+}
+
+static Expr* new_int_literal_expr(ParseContext* context, int i) {
+    IntLiteralExpr* expr = arena_allocate(
+        context->arena, sizeof(IntLiteralExpr)
+    );
+    expr->base.kind = ExprKind_IntLiteral;
+    expr->value = i;
+    return (Expr*)expr;
 }

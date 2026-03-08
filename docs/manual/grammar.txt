@@ -16,6 +16,7 @@ token <-
     "true" !id_continue
     "var" !id_continue
     ID
+    INT_LITERAL
     "("
     ")"
     ";"
@@ -23,6 +24,8 @@ token <-
     "="
     "!="
     "!"
+    "+"
+    "-"
     "&&"
     "||"
 
@@ -38,6 +41,8 @@ newline <-
 id_start <- [a-zA-Z_]
 id_continue <- id_start / [0-9]
 ID <- id_start id_continue*
+
+INT_LITERAL <- [1-9] [0-9]* !id_continue
 \end{peg}
 
 \section{Hierarchical grammar}
@@ -73,6 +78,7 @@ Expr ::=
     LogicalAndExpr
     LogicalOrExpr
     UnaryExpr CompareOp UnaryExpr
+    TermExpr
 
 CompareOp ::=
     "==" | "!="
@@ -85,13 +91,19 @@ LogicalOrExpr ::=
     LogicalOrExpr "||" UnaryExpr
     UnaryExpr "||" UnaryExpr
 
+TermExpr ::=
+    TermExpr ("+" | "-") UnaryExpr
+    UnaryExpr ("+" | "-") UnaryExpr
+
 UnaryExpr ::=
     PrimaryExpr
     "!" UnaryExpr
+    "-" UnaryExpr
 
 PrimaryExpr ::=
     "(" Expr ")"
     ID
+    INT_LITERAL
     "true"
     "false"
 \end{cfg}

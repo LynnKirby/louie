@@ -7,10 +7,12 @@
 
 typedef union AnyValue {
     bool b;
+    int i;
 } AnyValue;
 
 typedef enum ValueTag {
     ValueTag_Bool,
+    ValueTag_Int,
 } ValueTag;
 
 typedef struct TaggedValue {
@@ -18,8 +20,21 @@ typedef struct TaggedValue {
     ValueTag tag;
 } TaggedValue;
 
-#define TRUE ((TaggedValue){ .value.b = true, .tag = ValueTag_Bool })
-#define FALSE ((TaggedValue){ .value.b = false, .tag = ValueTag_Bool })
+static TaggedValue tagged_bool(bool b) {
+    return (TaggedValue){ .value.b = b, .tag = ValueTag_Bool };
+}
+
+static TaggedValue tagged_true(void) {
+    return tagged_bool(true);
+}
+
+static TaggedValue tagged_false(void) {
+    return tagged_bool(false);
+}
+
+static TaggedValue tagged_int(int i) {
+    return (TaggedValue){ .value.i = i, .tag = ValueTag_Int };
+}
 
 static bool equal(TaggedValue left, TaggedValue right) {
     assert(left.tag == right.tag);
@@ -27,6 +42,9 @@ static bool equal(TaggedValue left, TaggedValue right) {
     switch (left.tag) {
     case ValueTag_Bool:
         return left.value.b == right.value.b;
+
+    case ValueTag_Int:
+        return left.value.i == right.value.i;
     }
 
     assert(0);
@@ -86,8 +104,14 @@ static TaggedValue eval_expr(Scope* scope, Expr* expr);
 
 static TaggedValue eval_expr(Scope* scope, Expr* expr) {
     switch (expr->kind) {
-    case ExprKind_TrueLiteral: return TRUE;
-    case ExprKind_FalseLiteral: return FALSE;
+    case ExprKind_TrueLiteral:
+        return tagged_true();
+
+    case ExprKind_FalseLiteral:
+        return tagged_false();
+
+    case ExprKind_IntLiteral:
+        return tagged_int(((IntLiteralExpr*)expr)->value);
 
     case ExprKind_Id: {
         IdExpr* id_expr = (IdExpr*)expr;
@@ -104,8 +128,11 @@ static TaggedValue eval_expr(Scope* scope, Expr* expr) {
         switch (unary_expr->operator) {
         case UnaryOp_LogicalNot:
             assert(operand.tag == ValueTag_Bool);
-            operand.value.b = !operand.value.b;
-            return operand;
+            return tagged_bool(!operand.value.b);
+
+        case UnaryOp_Negate:
+            assert(operand.tag == ValueTag_Int);
+            return tagged_int(-(unsigned)operand.value.i);
         }
 
         break;
@@ -119,45 +146,61 @@ static TaggedValue eval_expr(Scope* scope, Expr* expr) {
         case BinaryOp_LogicalAnd: {
             assert(left_operand.tag == ValueTag_Bool);
             if (!left_operand.value.b) {
-                return FALSE;
+                return tagged_false();
             }
             TaggedValue right_operand = eval_expr(
                 scope, binary_expr->right_operand
             );
             assert(right_operand.tag == ValueTag_Bool);
-            if (right_operand.value.b) {
-                return TRUE;
-            }
-            return FALSE;
+            return right_operand;
         }
 
         case BinaryOp_LogicalOr: {
             assert(left_operand.tag == ValueTag_Bool);
             if (left_operand.value.b) {
-                return TRUE;
+                return tagged_true();
             }
             TaggedValue right_operand = eval_expr(
                 scope, binary_expr->right_operand
             );
             assert(right_operand.tag == ValueTag_Bool);
-            if (right_operand.value.b) {
-                return TRUE;
-            }
-            return FALSE;
+            return right_operand;
         }
 
         case BinaryOp_Equal: {
             TaggedValue right_operand = eval_expr(
                 scope, binary_expr->right_operand
             );
-            return equal(left_operand, right_operand) ? TRUE : FALSE;
+            return tagged_bool(equal(left_operand, right_operand));
         }
 
         case BinaryOp_NotEqual: {
             TaggedValue right_operand = eval_expr(
                 scope, binary_expr->right_operand
             );
-            return !equal(left_operand, right_operand) ? TRUE : FALSE;
+            return tagged_bool(!equal(left_operand, right_operand));
+        }
+
+        case BinaryOp_Add: {
+            TaggedValue right_operand = eval_expr(
+                scope, binary_expr->right_operand
+            );
+            assert(left_operand.tag == ValueTag_Int);
+            assert(right_operand.tag == ValueTag_Int);
+            return tagged_int(
+                (unsigned)left_operand.value.i + (unsigned)right_operand.value.i
+            );
+        }
+
+        case BinaryOp_Subtract: {
+            TaggedValue right_operand = eval_expr(
+                scope, binary_expr->right_operand
+            );
+            assert(left_operand.tag == ValueTag_Int);
+            assert(right_operand.tag == ValueTag_Int);
+            return tagged_int(
+                (unsigned)left_operand.value.i - (unsigned)right_operand.value.i
+            );
         }
         }
 
@@ -218,6 +261,10 @@ static void eval_stmt(Scope* scope, Stmt* stmt) {
             } else {
                 printf("false\n");
             }
+            return;
+
+        case ValueTag_Int:
+            printf("%i\n", value.value.i);
             return;
         }
     }

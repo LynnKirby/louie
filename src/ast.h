@@ -42,18 +42,22 @@ typedef struct Expr Expr;
 #define EXPR_KIND_LIST(X) \
     X(TrueLiteral)        \
     X(FalseLiteral)       \
+    X(IntLiteral)         \
     X(Id)                 \
     X(Unary)              \
     X(Binary)
 
 #define UNARY_OP_LIST(X) \
-    X(LogicalNot)
+    X(LogicalNot)        \
+    X(Negate)
 
 #define BINARY_OP_LIST(X) \
     X(LogicalAnd)         \
     X(LogicalOr)          \
     X(Equal)              \
-    X(NotEqual)
+    X(NotEqual)           \
+    X(Add)                \
+    X(Subtract)
 
 typedef enum StmtKind {
     #define X(name) StmtKind_##name,
@@ -147,6 +151,11 @@ typedef struct PrintStmt {
 struct Expr {
     ExprKind kind;
 };
+
+typedef struct IntLiteralExpr {
+    Expr base;
+    int value;
+} IntLiteralExpr;
 
 typedef struct IdExpr {
     Expr base;
