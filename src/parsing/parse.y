@@ -42,35 +42,47 @@ static Arena* ast_arena(ParseContext* context);
 
 %union {
     StmtSeq stmt_seq;
-    int i;
+    int integer;
     Stmt* stmt;
     Expr* expr;
     IfArm* if_arm;
-    AstString* str;
+    AstString* string;
     BinaryOp bin_op;
     UnaryOp un_op;
 }
 
+// 0 to match YYEOF
+%token EndOfFile 0
+
+%token UnexpectedCharacter
+
 // General.
-%token <str> ID
-%token <i> INT_LITERAL
+%token <string> Identifier
+%token <integer> IntLiteral
 
 // Keywords.
-%token ELSE
-%token ELSEIF
-%token END
-%token FALSE
-%token IF
-%token PRINT
-%token THEN
-%token TRUE
-%token VAR
+%token Else
+%token Elseif
+%token End
+%token False
+%token If
+%token Print
+%token Then
+%token True
+%token Var
 
-// Multi-character symbols.
-%token AMP_AMP
-%token BAR_BAR
-%token EQ_EQ
-%token NOT_EQ
+// Symbols.
+%token OpenParen
+%token CloseParen
+%token Semicolon
+%token Equal
+%token EqualEqual
+%token Exclaim
+%token ExclaimEqual
+%token Plus
+%token Minus
+%token AmpAmp
+%token BarBar
 
 // Non-terminal types.
 %type <stmt_seq> StmtSeq
@@ -113,28 +125,28 @@ Stmt:
     | VarStmt    { $$ = $1; }
     | AssignStmt { $$ = $1; }
     | IfStmt     { $$ = $1; }
-    | ';'        { $$ = NULL; }
+    | Semicolon  { $$ = NULL; }
 
 PrintStmt:
-      PRINT '(' Expr ')' { $$ = PRINT_STMT($3); }
+      Print OpenParen Expr CloseParen { $$ = PRINT_STMT($3); }
 
 VarStmt:
-      VAR ID          { $$ = VAR_STMT($2, NULL); }
-    | VAR ID '=' Expr { $$ = VAR_STMT($2, $4); }
+      Var Identifier            { $$ = VAR_STMT($2, NULL); }
+    | Var Identifier Equal Expr { $$ = VAR_STMT($2, $4); }
 
 AssignStmt:
-      ID '=' Expr { $$ = ASSIGN_STMT($1, $3); }
+      Identifier Equal Expr { $$ = ASSIGN_STMT($1, $3); }
 
 IfStmt:
-      IF IfArms END              { $$ = IF_STMT($2, stmt_seq_empty()); }
-    | IF IfArms ELSE StmtSeq END { $$ = IF_STMT($2, $4); }
+      If IfArms End              { $$ = IF_STMT($2, stmt_seq_empty()); }
+    | If IfArms Else StmtSeq End { $$ = IF_STMT($2, $4); }
 
 IfArms:
-      IfArm ELSEIF IfArms { $$ = $1; $1->next = $3; }
+      IfArm Elseif IfArms { $$ = $1; $1->next = $3; }
     | IfArm               { $$ = $1; }
 
 IfArm:
-      Expr THEN StmtSeq { $$ = IF_ARM($1, $3); }
+      Expr Then StmtSeq { $$ = IF_ARM($1, $3); }
 
 Expr:
       UnaryExpr      { $$ = $1; }
@@ -144,19 +156,19 @@ Expr:
     | TermExpr       { $$ = $1; }
 
 CompareOp:
-      EQ_EQ  { $$ = BinaryOp_Equal; }
-    | NOT_EQ { $$ = BinaryOp_NotEqual; }
+      EqualEqual   { $$ = BinaryOp_Equal; }
+    | ExclaimEqual { $$ = BinaryOp_NotEqual; }
 
 LogicalAndExpr:
-      LogicalAndExpr AMP_AMP UnaryExpr
+      LogicalAndExpr AmpAmp UnaryExpr
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalAnd); }
-    | UnaryExpr AMP_AMP UnaryExpr
+    | UnaryExpr AmpAmp UnaryExpr
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalAnd); }
 
 LogicalOrExpr:
-      LogicalOrExpr BAR_BAR UnaryExpr
+      LogicalOrExpr BarBar UnaryExpr
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalOr); }
-    | UnaryExpr BAR_BAR UnaryExpr
+    | UnaryExpr BarBar UnaryExpr
         { $$ = BINARY_EXPR($1, $3, BinaryOp_LogicalOr); }
 
 TermExpr:
@@ -166,74 +178,39 @@ TermExpr:
         { $$ = BINARY_EXPR($1, $3, $2); }
 
 TermOp:
-      '+' { $$ = BinaryOp_Add; }
-    | '-' { $$ = BinaryOp_Subtract; }
+      Plus  { $$ = BinaryOp_Add; }
+    | Minus { $$ = BinaryOp_Subtract; }
 
 UnaryExpr:
       PrimaryExpr       { $$ = $1; }
     | UnaryOp UnaryExpr { $$ = UNARY_EXPR($2, $1); }
 
 UnaryOp:
-      '!' { $$ = UnaryOp_LogicalNot; }
-    | '-' { $$ = UnaryOp_Negate; }
+      Exclaim { $$ = UnaryOp_LogicalNot; }
+    | Minus   { $$ = UnaryOp_Negate; }
 
 PrimaryExpr:
-      '(' Expr ')' { $$ = $2; }
-    | ID           { $$ = ID_EXPR($1); }
-    | TRUE         { $$ = TRUE_EXPR(); }
-    | FALSE        { $$ = FALSE_EXPR(); }
-    | INT_LITERAL  { $$ = INT_LITERAL_EXPR($1); }
+      OpenParen Expr CloseParen { $$ = $2; }
+    | Identifier { $$ = ID_EXPR($1); }
+    | True       { $$ = TRUE_EXPR(); }
+    | False      { $$ = FALSE_EXPR(); }
+    | IntLiteral { $$ = INT_LITERAL_EXPR($1); }
 
 %%
 
+#include "src/parsing/lex.h"
+
 #include <assert.h>
-#include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 struct ParseContext {
-    AstContext* ast_context;
+    ParseResult* result;
     Arena* arena;
-
-    uint8_t const* cursor;
-    uint8_t const* limit;
-    int cursor_line;
-    int cursor_column;
-
+    Lexer lexer;
     YaccLocation error_loc;
     bool has_unexpected_character;
-
-    ParseResult* result;
 };
-
-static bool is_id_start(uint8_t c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
-}
-
-static bool is_id_continue(uint8_t c) {
-    return is_id_start(c) || (c >= '0' && c <= '9');
-}
-
-static int keyword_or_id(uint8_t const* data, size_t size) {
-    #define KEYWORD(n, s) \
-        if (sizeof(s) - 1 == size && memcmp(s, data, size) == 0) return n;
-
-    KEYWORD(ELSE, "else")
-    KEYWORD(ELSEIF, "elseif")
-    KEYWORD(END, "end")
-    KEYWORD(FALSE, "false")
-    KEYWORD(IF, "if")
-    KEYWORD(PRINT, "print")
-    KEYWORD(THEN, "then")
-    KEYWORD(TRUE, "true")
-    KEYWORD(VAR, "var")
-
-    #undef KEYWORD
-
-    return ID;
-}
 
 static void yyerror(
     YaccLocation* loc, ParseContext* context, char const* message
@@ -243,169 +220,33 @@ static void yyerror(
 }
 
 static int yylex(YaccValue* val, YaccLocation* loc, ParseContext* context) {
-loop:
-    if (context->cursor == context->limit) {
-        return YYEOF;
-    }
+    // Map TokenKind to yacc token.
+    static int const kind_map[] = {
+        #define TOKEN_KIND(name) name,
+        #include "src/parsing/token_kind.def"
+    };
 
-    loc->first_line = context->cursor_line;
-    loc->first_column = context->cursor_column;
+    Token token;
+    lexer_next(&context->lexer, &token);
 
-    if (is_id_start(*context->cursor)) {
-        uint8_t const* start = context->cursor;
-        context->cursor += 1;
-        context->cursor_column += 1;
-
-        while (
-            (context->cursor < context->limit) &&
-            is_id_continue(*context->cursor)
-        ) {
-            context->cursor += 1;
-            context->cursor_column += 1;
-        }
-
-        size_t size = context->cursor - start;
-        int kind = keyword_or_id(start, size);
-
-        if (kind == ID) {
-            val->str = ast_string_new(
-                context->ast_context,
-                (char const*)start,
-                size
-            );
-        }
-
-        return kind;
-    }
-
-    uint8_t c = *context->cursor;
-
-    if (c == '0') {
-        // TODO: report actual error (leading zero not allowed)
-        goto unexpected_character;
-    }
-
-    if (c >= '1' && c <= '9') {
-        unsigned i = c - '0';
-        context->cursor += 1;
-        context->cursor_column += 1;
-        for (;;) {
-            if (context->cursor == context->limit) break;
-            c = *context->cursor;
-            if (c < '0' || c > '9') break;
-            i *= 10;
-            i += c - '0';
-            context->cursor += 1;
-            context->cursor_column += 1;
-        }
-
-        if (context->cursor < context->limit) {
-            c = *context->cursor;
-            if (is_id_continue(c)) {
-                // TODO: report the actual error (trailing junk after literal)
-                goto unexpected_character;
-            }
-        }
-
-        val->i = i;
-        return INT_LITERAL;
-    }
-
-    switch (c) {
-    // Line comment.
-    case '#':
-        context->cursor += 1;
-        context->cursor_column += 1;
-        for (;;) {
-            if (context->cursor == context->limit) break;
-            if (*context->cursor == '\r') break;
-            if (*context->cursor == '\n') break;
-            context->cursor += 1;
-            context->cursor_column += 1;
-        }
-        goto loop;
-
-    // Whitespace.
-    case ' ':
-    case '\t':
-        context->cursor += 1;
-        context->cursor_column += 1;
-        goto loop;
-
-    // Newline.
-    case '\r':
-        if (context->cursor + 1 != context->limit && *context->cursor == '\n') {
-            // CR LF
-            context->cursor += 1;
-        }
-        // fallthrough
-    case '\n':
-        context->cursor += 1;
-        context->cursor_line += 1;
-        context->cursor_column = 1;
-        goto loop;
-
-    // One character symbols that are not a prefix of another symbol.
-    case '(': case ')':
-    case ';':
-    case '+':
-    case '-':
-        context->cursor += 1;
-        context->cursor_column += 1;
-        return c;
-
-    case '=':
-        if (context->cursor + 1 < context->limit) {
-            if (context->cursor[1] == '=') {
-                context->cursor += 2;
-                context->cursor_column += 2;
-                return EQ_EQ;
-            }
-        }
-        context->cursor += 1;
-        context->cursor_column += 1;
-        return '=';
-
-    case '!':
-        if (context->cursor + 1 < context->limit) {
-            if (context->cursor[1] == '=') {
-                context->cursor += 2;
-                context->cursor_column += 2;
-                return NOT_EQ;
-            }
-        }
-        context->cursor += 1;
-        context->cursor_column += 1;
-        return '!';
-
-    case '&':
-        if (context->cursor + 1 < context->limit) {
-            if (context->cursor[1] == '&') {
-                context->cursor += 2;
-                context->cursor_column += 2;
-                return AMP_AMP;
-            }
-        }
+    switch (token.kind) {
+    case TokenKind_Identifier:
+        val->string = token.as.string;
         break;
-
-    case '|':
-        if (context->cursor + 1 < context->limit) {
-            if (context->cursor[1] == '|') {
-                context->cursor += 2;
-                context->cursor_column += 2;
-                return BAR_BAR;
-            }
-        }
+    case TokenKind_IntLiteral:
+        val->integer = token.as.integer;
+        break;
+    case TokenKind_UnexpectedCharacter:
+        context->has_unexpected_character = true;
+        break;
+    default:
         break;
     }
 
-unexpected_character:
-    // TODO: report character
-    loc->first_line = context->cursor_line;
-    loc->first_column = context->cursor_column;
-    context->has_unexpected_character = true;
-    context->error_loc = *loc;
-    return 1;
+    loc->first_line = token.line;
+    loc->first_column = token.column;
+
+    return kind_map[token.kind];
 }
 
 void parse_bytes(
@@ -416,15 +257,12 @@ void parse_bytes(
     size_t size
 ) {
     ParseContext context = {
-        .ast_context = ast_context,
         .arena = arena,
-        .cursor = (uint8_t const*)data,
-        .limit = (uint8_t const*)data + size,
         .result = result,
-        .cursor_line = 1,
-        .cursor_column = 1,
         .has_unexpected_character = false,
     };
+
+    lexer_init(&context.lexer, data, size, ast_context);
 
     // Note: these values are correct for byacc and Bison. They might not work
     // elsewhere.
@@ -452,6 +290,8 @@ void parse_bytes(
         assert(!"unexpected yyparse() result code");
         break;
     }
+
+    lexer_destroy(&context.lexer);
 }
 
 static void set_result(ParseContext* context, StmtSeq seq) {

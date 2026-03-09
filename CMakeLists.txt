@@ -64,6 +64,7 @@ set(
         src/ast/ast_dump.c
         src/ast/ast_construct.c
         src/interpreter/eval.c
+        src/parsing/lex.c
         src/parsing/parse.tab.c
 )
 
@@ -146,4 +147,5 @@ if(LOUIE_INCLUDE_FUZZERS)
     endfunction()
 
     louie_add_fuzzer(parse_fuzz src/parsing/parse_fuzz.c)
+    louie_add_fuzzer(lex_fuzz src/parsing/lex_fuzz.c)
 endif()

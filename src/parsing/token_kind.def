@@ -1,0 +1,50 @@
+// Token kind x-macros.
+
+#ifndef TOKEN_KIND
+    #define TOKEN_KIND(name)
+#endif
+
+#ifndef ERROR_TOKEN_KIND
+    #define ERROR_TOKEN_KIND(name) TOKEN_KIND(name)
+#endif
+
+#ifndef KEYWORD_TOKEN_KIND
+    #define KEYWORD_TOKEN_KIND(name, spelling) TOKEN_KIND(name)
+#endif
+
+#ifndef SYMBOL_TOKEN_KIND
+    #define SYMBOL_TOKEN_KIND(name, spelling) TOKEN_KIND(name)
+#endif
+
+TOKEN_KIND(EndOfFile)
+TOKEN_KIND(Identifier)
+TOKEN_KIND(IntLiteral)
+
+ERROR_TOKEN_KIND(UnexpectedCharacter)
+
+KEYWORD_TOKEN_KIND(Elseif, "elseif")
+KEYWORD_TOKEN_KIND(Else, "else")
+KEYWORD_TOKEN_KIND(End, "end")
+KEYWORD_TOKEN_KIND(False, "false")
+KEYWORD_TOKEN_KIND(If, "if")
+KEYWORD_TOKEN_KIND(Print, "print")
+KEYWORD_TOKEN_KIND(Then, "then")
+KEYWORD_TOKEN_KIND(True, "true")
+KEYWORD_TOKEN_KIND(Var, "var")
+
+SYMBOL_TOKEN_KIND(OpenParen, "(")
+SYMBOL_TOKEN_KIND(CloseParen, ")")
+SYMBOL_TOKEN_KIND(Semicolon, ";")
+SYMBOL_TOKEN_KIND(Equal, "=")
+SYMBOL_TOKEN_KIND(EqualEqual, "==")
+SYMBOL_TOKEN_KIND(Exclaim, "!")
+SYMBOL_TOKEN_KIND(ExclaimEqual, "!=")
+SYMBOL_TOKEN_KIND(Plus, "+")
+SYMBOL_TOKEN_KIND(Minus, "-")
+SYMBOL_TOKEN_KIND(AmpAmp, "&&")
+SYMBOL_TOKEN_KIND(BarBar, "||")
+
+#undef TOKEN_KIND
+#undef ERROR_TOKEN_KIND
+#undef KEYWORD_TOKEN_KIND
+#undef SYMBOL_TOKEN_KIND
