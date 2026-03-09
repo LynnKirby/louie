@@ -23,30 +23,20 @@ static int yylex(YaccValue* val, YaccLocation* loc, ParseContext* context);
 
 static void set_result(ParseContext* context, StmtSeq seq);
 
-static Stmt* new_print_stmt(ParseContext* context, Expr* value);
-static Stmt* new_var_stmt(ParseContext* context, AstString* name, Expr* value);
-static Stmt* new_assign_stmt(ParseContext* context, AstString* name, Expr* value);
-static Stmt* new_if_stmt(ParseContext* context, IfArm* if_arms, StmtSeq else_part);
-static IfArm* new_if_arm(ParseContext* context, Expr* condition, StmtSeq body);
-static Expr* new_unary_expr(ParseContext* context, Expr* operand, UnaryOp operator);
-static Expr* new_binary_expr(ParseContext* context, Expr* left, Expr* right, BinaryOp operator);
-static Expr* new_id_expr(ParseContext* context, AstString* name);
-static Expr* new_true_expr(ParseContext* context);
-static Expr* new_false_expr(ParseContext* context);
-static Expr* new_int_literal_expr(ParseContext* context, int i);
+static Arena* ast_arena(ParseContext* context);
 
 #define SET_RESULT(...) set_result(context, __VA_ARGS__)
-#define PRINT_STMT(...) new_print_stmt(context, __VA_ARGS__)
-#define VAR_STMT(...) new_var_stmt(context, __VA_ARGS__)
-#define ASSIGN_STMT(...) new_assign_stmt(context, __VA_ARGS__)
-#define IF_STMT(...) new_if_stmt(context, __VA_ARGS__)
-#define IF_ARM(...) new_if_arm(context, __VA_ARGS__)
-#define UNARY_EXPR(...) new_unary_expr(context, __VA_ARGS__)
-#define BINARY_EXPR(...) new_binary_expr(context, __VA_ARGS__)
-#define ID_EXPR(...) new_id_expr(context, __VA_ARGS__)
-#define TRUE_EXPR(...) new_true_expr(context)
-#define FALSE_EXPR(...) new_false_expr(context)
-#define INT_LITERAL_EXPR(...) new_int_literal_expr(context, __VA_ARGS__)
+#define PRINT_STMT(...) (Stmt*)print_stmt_new(ast_arena(context), __VA_ARGS__)
+#define VAR_STMT(...) (Stmt*)var_stmt_new(ast_arena(context), __VA_ARGS__)
+#define ASSIGN_STMT(...) (Stmt*)assign_stmt_new(ast_arena(context), __VA_ARGS__)
+#define IF_STMT(...) (Stmt*)if_stmt_new(ast_arena(context), __VA_ARGS__)
+#define IF_ARM(...) if_arm_new(ast_arena(context), __VA_ARGS__)
+#define UNARY_EXPR(...) (Expr*)unary_expr_new(ast_arena(context), __VA_ARGS__)
+#define BINARY_EXPR(...) (Expr*)binary_expr_new(ast_arena(context), __VA_ARGS__)
+#define ID_EXPR(...) (Expr*)id_expr_new(ast_arena(context), __VA_ARGS__)
+#define TRUE_EXPR(...) bool_literal_expr_new(ast_arena(context), true)
+#define FALSE_EXPR(...) bool_literal_expr_new(ast_arena(context), false)
+#define INT_LITERAL_EXPR(...) (Expr*)int_literal_expr_new(ast_arena(context), __VA_ARGS__)
 
 }
 
@@ -465,104 +455,10 @@ void parse_bytes(
 }
 
 static void set_result(ParseContext* context, StmtSeq seq) {
-    AstFile* file = arena_allocate(context->arena, sizeof(AstFile));
-    file->body = seq;
     context->result->kind = ParseResultKind_Success;
-    context->result->as.file = file;
+    context->result->as.file = ast_file_new(context->arena, seq);
 }
 
-static Stmt* new_print_stmt(ParseContext* context, Expr* value) {
-    PrintStmt* stmt = arena_allocate(context->arena, sizeof(PrintStmt));
-    stmt->base.kind = StmtKind_Print;
-    stmt->base.next = NULL;
-    stmt->value = value;
-    return (Stmt*)stmt;
-}
-
-static Stmt* new_var_stmt(ParseContext* context, AstString* name, Expr* value) {
-    VarStmt* stmt = arena_allocate(context->arena, sizeof(VarStmt));
-    stmt->base.kind = StmtKind_Var;
-    stmt->base.next = NULL;
-    stmt->name = name;
-    stmt->value = value;
-    return (Stmt*)stmt;
-}
-
-static Stmt* new_assign_stmt(
-    ParseContext* context, AstString* name, Expr* value
-) {
-    AssignStmt* stmt = arena_allocate(context->arena, sizeof(AssignStmt));
-    stmt->base.kind = StmtKind_Assign;
-    stmt->base.next = NULL;
-    stmt->name = name;
-    stmt->value = value;
-    return (Stmt*)stmt;
-}
-
-static Stmt* new_if_stmt(
-    ParseContext* context, IfArm* if_arms, StmtSeq else_body
-) {
-    IfStmt* stmt = arena_allocate(context->arena, sizeof(IfStmt));
-    stmt->base.kind = StmtKind_If;
-    stmt->base.next = NULL;
-    stmt->if_arms = if_arms;
-    stmt->else_body = else_body;
-    return (Stmt*)stmt;
-}
-
-static IfArm* new_if_arm(ParseContext* context, Expr* condition, StmtSeq body) {
-    IfArm* part = arena_allocate(context->arena, sizeof(IfArm));
-    part->next = NULL;
-    part->condition = condition;
-    part->body = body;
-    return part;
-}
-
-static Expr* new_unary_expr(
-    ParseContext* context, Expr* operand, UnaryOp operator
-) {
-    UnaryExpr* expr = arena_allocate(context->arena, sizeof(UnaryExpr));
-    expr->base.kind = ExprKind_Unary;
-    expr->operand = operand;
-    expr->operator = operator;
-    return (Expr*)expr;
-}
-
-static Expr* new_binary_expr(
-    ParseContext* context, Expr* left, Expr* right, BinaryOp operator
-) {
-    BinaryExpr* expr = arena_allocate(context->arena, sizeof(BinaryExpr));
-    expr->base.kind = ExprKind_Binary;
-    expr->left_operand = left;
-    expr->right_operand = right;
-    expr->operator = operator;
-    return (Expr*)expr;
-}
-
-static Expr* new_id_expr(ParseContext* context, AstString* name) {
-    IdExpr* expr = arena_allocate(context->arena, sizeof(IdExpr));
-    expr->base.kind = ExprKind_Id;
-    expr->name = name;
-    return (Expr*)expr;
-}
-
-static Expr* new_true_expr(ParseContext* context) {
-    Expr* expr = arena_allocate(context->arena, sizeof(Expr));
-    expr->kind = ExprKind_TrueLiteral;
-    return expr;
-}
-
-static Expr* new_false_expr(ParseContext* context) {
-    Expr* expr = arena_allocate(context->arena, sizeof(Expr));
-    expr->kind = ExprKind_FalseLiteral;
-    return expr;
-}
-
-static Expr* new_int_literal_expr(ParseContext* context, int i) {
-    IntLiteralExpr* expr = arena_allocate(
-        context->arena, sizeof(IntLiteralExpr)
-    );
-    expr->base.kind = ExprKind_IntLiteral;
-    expr->value = i;
-    return (Expr*)expr;
+static Arena* ast_arena(ParseContext* context) {
+    return context->arena;
 }

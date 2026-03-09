@@ -62,6 +62,7 @@ set(
         src/arena.c
         src/ast.c
         src/ast_dump.c
+        src/ast_construct.c
         src/eval.c
         src/parse.tab.c
 )

@@ -1,6 +1,9 @@
 #ifndef _louie_src_ast_h
 #define _louie_src_ast_h
 
+#include "src/arena.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -174,6 +177,25 @@ typedef struct BinaryExpr {
     Expr* left_operand;
     Expr* right_operand;
 } BinaryExpr;
+
+//
+// Constructors and manipulators
+//
+
+AstFile* ast_file_new(Arena* arena, StmtSeq body);
+
+IfArm* if_arm_new(Arena* arena, Expr* condition, StmtSeq body);
+IfStmt* if_stmt_new(Arena* arena, IfArm* if_arms, StmtSeq else_body);
+VarStmt* var_stmt_new(Arena* arena, AstString* name, Expr* value);
+AssignStmt* assign_stmt_new(Arena* arena, AstString* name, Expr* value);
+PrintStmt* print_stmt_new(Arena* arena, Expr* value);
+
+Expr* bool_literal_expr_new(Arena* arena, bool value);
+IntLiteralExpr* int_literal_expr_new(Arena* arena, int value);
+IdExpr* id_expr_new(Arena* arena, AstString* name);
+
+UnaryExpr* unary_expr_new(Arena* arena, Expr* operand, UnaryOp operator);
+BinaryExpr* binary_expr_new(Arena* arena, Expr* left, Expr* right, BinaryOp operator);
 
 static inline StmtSeq stmt_seq_empty(void) {
     return (StmtSeq){ NULL, NULL };
