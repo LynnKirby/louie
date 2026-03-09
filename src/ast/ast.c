@@ -1,5 +1,5 @@
-#include "src/ast.h"
-#include "src/arena.h"
+#include "src/ast/ast.h"
+#include "src/base/arena.h"
 
 #include <stdint.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-#include "src/eval.h"
+#include "src/interpreter/eval.h"
 
 #include <assert.h>
 #include <stdbool.h>

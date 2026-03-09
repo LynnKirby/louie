@@ -1,4 +1,4 @@
-#include "src/ast.h"
+#include "src/ast/ast.h"
 
 AstFile* ast_file_new(Arena* arena, StmtSeq body) {
     AstFile* file = arena_allocate(arena, sizeof(AstFile));

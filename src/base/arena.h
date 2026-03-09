@@ -1,5 +1,5 @@
-#ifndef _louie_src_arena_h
-#define _louie_src_arena_h
+#ifndef _louie_src_base_arena_h
+#define _louie_src_base_arena_h
 
 #include <stddef.h>
 

@@ -7,7 +7,7 @@
 %parse-param {ParseContext* context}
 
 %code top {
-#include "src/parse.h"
+#include "src/parsing/parse.h"
 
 typedef struct ParseContext ParseContext;
 }

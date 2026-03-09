@@ -1,8 +1,8 @@
-#ifndef _louie_src_parse_h
-#define _louie_src_parse_h
+#ifndef _louie_src_parsing_parse_h
+#define _louie_src_parsing_parse_h
 
-#include "src/ast.h"
-#include "src/arena.h"
+#include "src/ast/ast.h"
+#include "src/base/arena.h"
 
 #include <stddef.h>
 

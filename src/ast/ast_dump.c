@@ -1,4 +1,4 @@
-#include "src/ast.h"
+#include "src/ast/ast.h"
 
 char const* stmt_kind_name(StmtKind kind) {
     static char const* const names[] = {

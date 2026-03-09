@@ -1,7 +1,7 @@
-#ifndef _louie_src_ast_h
-#define _louie_src_ast_h
+#ifndef _louie_src_ast_ast_h
+#define _louie_src_ast_ast_h
 
-#include "src/arena.h"
+#include "src/base/arena.h"
 
 #include <stdbool.h>
 #include <stddef.h>

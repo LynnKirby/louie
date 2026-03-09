@@ -1,5 +1,5 @@
-#include "src/parse.h"
-#include "src/eval.h"
+#include "src/parsing/parse.h"
+#include "src/interpreter/eval.h"
 
 #include <stdio.h>
 #include <stdlib.h>

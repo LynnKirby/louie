@@ -1,6 +1,6 @@
 #undef NDEBUG
 
-#include "src/arena.h"
+#include "src/base/arena.h"
 
 #include <assert.h>
 #include <stdint.h>

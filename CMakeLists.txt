@@ -59,12 +59,12 @@ target_include_directories(louie-options INTERFACE .)
 
 set(
     sources
-        src/arena.c
-        src/ast.c
-        src/ast_dump.c
-        src/ast_construct.c
-        src/eval.c
-        src/parse.tab.c
+        src/base/arena.c
+        src/ast/ast.c
+        src/ast/ast_dump.c
+        src/ast/ast_construct.c
+        src/interpreter/eval.c
+        src/parsing/parse.tab.c
 )
 
 #
@@ -72,14 +72,14 @@ set(
 #
 
 add_custom_command(
-    OUTPUT src/parse.tab.c
-    BYPRODUCTS src/parse.output
-    MAIN_DEPENDENCY src/parse.y
+    OUTPUT src/parsing/parse.tab.c
+    BYPRODUCTS src/parsing/parse.output
+    MAIN_DEPENDENCY src/parsing/parse.y
     COMMAND
         "${YACC_EXECUTABLE}"
         -v
-        -b src/parse
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/parse.y"
+        -b src/parsing/parse
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/parsing/parse.y"
 )
 
 #
@@ -89,7 +89,7 @@ add_custom_command(
 add_library(louie-objects OBJECT ${sources})
 add_louie_options(louie-objects)
 
-add_executable(louie src/main.c)
+add_executable(louie src/launcher/main.c)
 target_link_libraries(louie PRIVATE louie-objects)
 add_louie_options(louie)
 
@@ -100,7 +100,7 @@ add_louie_options(louie)
 if(LOUIE_INCLUDE_TESTS)
     include(CTest)
 
-    add_executable(arena_test src/arena_test.c)
+    add_executable(arena_test src/base/arena_test.c)
     add_louie_options(arena_test)
     target_link_libraries(arena_test PRIVATE louie-objects)
 
@@ -145,5 +145,5 @@ if(LOUIE_INCLUDE_FUZZERS)
         endif()
     endfunction()
 
-    louie_add_fuzzer(parse_fuzz src/parse_fuzz.c)
+    louie_add_fuzzer(parse_fuzz src/parsing/parse_fuzz.c)
 endif()
